@@ -289,7 +289,7 @@ export interface HeaterRecord {
   heaterNumber: number; // 1–7
   lastReplacedDate: string;
   replacementCost: number;
-  expectedCycleDays: number;
+  expectedCycleUnits: number; // cups produced before next maintenance
   history: { date: string; cost: number; notes?: string }[];
 }
 
@@ -300,7 +300,7 @@ export interface ComponentRecord {
   componentName?: string;
   lastReplacedDate: string;
   replacementCost: number;
-  expectedCycleDays: number;
+  expectedCycleUnits: number; // cups produced before next maintenance
   history: { date: string; cost: number; notes?: string }[];
 }
 

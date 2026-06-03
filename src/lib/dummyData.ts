@@ -349,7 +349,7 @@ export function seedDummyData() {
       heaters.push({
         machineId: machine, heaterNumber: h,
         lastReplacedDate: d(daysAgoReplaced), replacementCost: cost,
-        expectedCycleDays: 30 + Math.floor(Math.random() * 30),
+        expectedCycleUnits: (30 + Math.floor(Math.random() * 30)) * 15000,
         history: [{ date: d(daysAgoReplaced + 35), cost, notes: 'Routine replacement' }],
       });
     }
@@ -362,13 +362,13 @@ export function seedDummyData() {
     const tcDays = 15 + Math.floor(Math.random() * 30);
     components.push({
       id: uid(), machineId: machine, componentType: 'thermocouple',
-      lastReplacedDate: d(tcDays), replacementCost: 450, expectedCycleDays: 45,
+      lastReplacedDate: d(tcDays), replacementCost: 450, expectedCycleUnits: 300000,
       history: [{ date: d(tcDays + 45), cost: 450 }],
     });
     const bcDays = 20 + Math.floor(Math.random() * 40);
     components.push({
       id: uid(), machineId: machine, componentType: 'bottomCutter',
-      lastReplacedDate: d(bcDays), replacementCost: 850, expectedCycleDays: 60,
+      lastReplacedDate: d(bcDays), replacementCost: 850, expectedCycleUnits: 400000,
       history: [{ date: d(bcDays + 60), cost: 850 }],
     });
   });

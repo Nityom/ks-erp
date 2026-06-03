@@ -7,7 +7,7 @@ import {
 } from '@/lib/storage';
 import type { SaleEntry, CupProductionSession, PlateProductionSession } from '@/lib/types';
 import { Card, StatCard, Alert } from '@/components/UI';
-import { formatINR, formatNumber, todayDDMMYYYY, daysUntil, currentMonth } from '@/lib/utils';
+import { formatINR, formatNumber, todayDDMMYYYY, cupsUsedSince, currentMonth } from '@/lib/utils';
 import { useApp } from '@/contexts/AppContext';
 import { Factory, ShoppingCart, Package, Wrench, TrendingUp, AlertTriangle, BarChart3 } from 'lucide-react';
 import { Bar } from 'react-chartjs-2';
@@ -46,8 +46,16 @@ export default function Home() {
   const heaters = getHeaters();
   const components = getComponents();
   const maintenanceAlerts = [
-    ...heaters.filter(h => h.lastReplacedDate && daysUntil(h.lastReplacedDate, h.expectedCycleDays) <= 7).map(h => `Machine ${h.machineId} Heater ${h.heaterNumber}`),
-    ...components.filter(c => c.lastReplacedDate && daysUntil(c.lastReplacedDate, c.expectedCycleDays) <= 7).map(c => `Machine ${c.machineId} ${c.componentName ?? c.componentType}`),
+    ...heaters.filter(h => {
+      if (!h.lastReplacedDate) return false;
+      const used = cupsUsedSince(h.machineId, h.lastReplacedDate, cupProd);
+      return used >= (h.expectedCycleUnits ?? 500000) * 0.9;
+    }).map(h => `Machine ${h.machineId} Heater ${h.heaterNumber}`),
+    ...components.filter(c => {
+      if (!c.lastReplacedDate) return false;
+      const used = cupsUsedSince(c.machineId, c.lastReplacedDate, cupProd);
+      return used >= (c.expectedCycleUnits ?? 300000) * 0.9;
+    }).map(c => `Machine ${c.machineId} ${c.componentName ?? c.componentType}`),
   ];
 
   const stock = getRMStock();

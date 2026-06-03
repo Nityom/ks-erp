@@ -4,24 +4,42 @@ import {
   getHeaters, saveHeaters,
   getComponents, saveComponents,
   getPlateMaintenance, savePlateMaintenance,
+  getCupProduction,
 } from '@/lib/storage';
-import type { HeaterRecord, ComponentRecord, PlateMaintenanceEntry, MaintenanceMachineId } from '@/lib/types';
+import type { HeaterRecord, ComponentRecord, PlateMaintenanceEntry, MaintenanceMachineId, CupProductionSession } from '@/lib/types';
 import {
   Card, Button, Input, Select, Modal, Table, SectionHeader,
   Tabs, Badge, StatCard,
 } from '@/components/UI';
 import {
   formatINR, formatNumber, generateId, todayDDMMYYYY,
-  fromInputDate, toInputDate, daysUntil, currentMonth,
+  fromInputDate, toInputDate, cupsUsedSince, currentMonth,
 } from '@/lib/utils';
-import { Plus, AlertTriangle, CheckCircle } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 
 const MACHINES: MaintenanceMachineId[] = ['A', 'B', 'C'];
 
-function getStatusBadge(days: number) {
-  if (days < 0) return <Badge variant="red">Overdue ({Math.abs(days)}d)</Badge>;
-  if (days <= 7) return <Badge variant="amber">Due in {days}d</Badge>;
-  return <Badge variant="green">OK ({days}d left)</Badge>;
+// Alert threshold: warn when >= 90% of cycle units consumed
+const ALERT_THRESHOLD = 0.9;
+
+function getUsageBadge(used: number, cycleUnits: number) {
+  if (!cycleUnits) return <Badge variant="gray">No limit set</Badge>;
+  const remaining = cycleUnits - used;
+  const pct = used / cycleUnits;
+  if (pct >= 1) return <Badge variant="red">Overdue ({formatNumber(Math.abs(remaining))} over)</Badge>;
+  if (pct >= ALERT_THRESHOLD) return <Badge variant="amber">Due soon ({formatNumber(remaining)} left)</Badge>;
+  return <Badge variant="green">{formatNumber(remaining)} left</Badge>;
+}
+
+function UsageBar({ used, total }: { used: number; total: number }) {
+  if (!total) return null;
+  const pct = Math.min(used / total, 1) * 100;
+  const color = pct >= 100 ? 'bg-red-500' : pct >= 90 ? 'bg-amber-400' : 'bg-green-500';
+  return (
+    <div className="w-full h-1.5 rounded-full bg-gray-200 dark:bg-gray-700 mt-1">
+      <div className={`h-1.5 rounded-full ${color}`} style={{ width: `${pct}%` }} />
+    </div>
+  );
 }
 
 function initHeaters(): HeaterRecord[] {
@@ -33,7 +51,7 @@ function initHeaters(): HeaterRecord[] {
         heaterNumber: i,
         lastReplacedDate: '',
         replacementCost: 0,
-        expectedCycleDays: 45,
+        expectedCycleUnits: 500000,
         history: [],
       });
     }
@@ -51,7 +69,7 @@ function initComponents(): ComponentRecord[] {
         componentType: type,
         lastReplacedDate: '',
         replacementCost: 0,
-        expectedCycleDays: 60,
+        expectedCycleUnits: type === 'thermocouple' ? 300000 : 400000,
         history: [],
       });
     }
@@ -63,43 +81,54 @@ export default function MaintenancePage() {
   const [heaters, setHeaters] = useState<HeaterRecord[]>(initHeaters());
   const [components, setComponents] = useState<ComponentRecord[]>(initComponents());
   const [plateLogs, setPlateLogs] = useState<PlateMaintenanceEntry[]>([]);
+  const [prodSessions, setProdSessions] = useState<CupProductionSession[]>([]);
   const [tab, setTab] = useState('dashboard');
   const [heaterModal, setHeaterModal] = useState<HeaterRecord | null>(null);
   const [compModal, setCompModal] = useState<ComponentRecord | null>(null);
   const [plateModal, setPlateModal] = useState(false);
   const [otherModal, setOtherModal] = useState(false);
 
-  const [heaterForm, setHeaterForm] = useState({ date: todayDDMMYYYY(), cost: 0, cycleDays: 45 });
-  const [compForm, setCompForm] = useState({ date: todayDDMMYYYY(), cost: 0, cycleDays: 60 });
+  const [heaterForm, setHeaterForm] = useState({ date: todayDDMMYYYY(), cost: 0, cycleUnits: 500000 });
+  const [compForm, setCompForm] = useState({ date: todayDDMMYYYY(), cost: 0, cycleUnits: 300000 });
   const [plateForm, setPlateForm] = useState<Omit<PlateMaintenanceEntry, 'id'>>({ date: todayDDMMYYYY(), description: '', cost: 0 });
   const [otherForm, setOtherForm] = useState<Omit<ComponentRecord, 'id' | 'history'>>({
-    machineId: 'A', componentType: 'other', componentName: '', lastReplacedDate: todayDDMMYYYY(), replacementCost: 0, expectedCycleDays: 30,
+    machineId: 'A', componentType: 'other', componentName: '', lastReplacedDate: todayDDMMYYYY(), replacementCost: 0, expectedCycleUnits: 100000,
   });
 
   useEffect(() => {
     const stored = getHeaters();
-    if (stored.length > 0) setHeaters(stored);
+    // Migrate old records that have expectedCycleDays but not expectedCycleUnits
+    const migrated = (stored.length > 0 ? stored : initHeaters()).map(h => ({
+      ...h,
+      expectedCycleUnits: (h as HeaterRecord & { expectedCycleUnits?: number }).expectedCycleUnits ?? 500000,
+    }));
+    setHeaters(migrated);
     const storedComp = getComponents();
-    if (storedComp.length > 0) setComponents(storedComp);
+    const migratedComp = (storedComp.length > 0 ? storedComp : initComponents()).map(c => ({
+      ...c,
+      expectedCycleUnits: (c as ComponentRecord & { expectedCycleUnits?: number }).expectedCycleUnits ?? (c.componentType === 'thermocouple' ? 300000 : 400000),
+    }));
+    setComponents(migratedComp);
     setPlateLogs(getPlateMaintenance());
+    setProdSessions(getCupProduction());
   }, []);
 
-  const updateHeater = (h: HeaterRecord, date: string, cost: number, cycleDays: number) => {
+  const updateHeater = (h: HeaterRecord, date: string, cost: number, cycleUnits: number) => {
     const entry = { date, cost };
     const updated = heaters.map(x =>
       x.machineId === h.machineId && x.heaterNumber === h.heaterNumber
-        ? { ...x, lastReplacedDate: date, replacementCost: cost, expectedCycleDays: cycleDays, history: [...x.history, entry] }
+        ? { ...x, lastReplacedDate: date, replacementCost: cost, expectedCycleUnits: cycleUnits, history: [...x.history, entry] }
         : x
     );
     saveHeaters(updated); setHeaters(updated);
     setHeaterModal(null);
   };
 
-  const updateComponent = (c: ComponentRecord, date: string, cost: number, cycleDays: number) => {
+  const updateComponent = (c: ComponentRecord, date: string, cost: number, cycleUnits: number) => {
     const entry = { date, cost };
     const updated = components.map(x =>
       x.id === c.id
-        ? { ...x, lastReplacedDate: date, replacementCost: cost, expectedCycleDays: cycleDays, history: [...x.history, entry] }
+        ? { ...x, lastReplacedDate: date, replacementCost: cost, expectedCycleUnits: cycleUnits, history: [...x.history, entry] }
         : x
     );
     saveComponents(updated); setComponents(updated);
@@ -111,7 +140,7 @@ export default function MaintenancePage() {
     const updated = [...components, entry];
     saveComponents(updated); setComponents(updated);
     setOtherModal(false);
-    setOtherForm({ machineId: 'A', componentType: 'other', componentName: '', lastReplacedDate: todayDDMMYYYY(), replacementCost: 0, expectedCycleDays: 30 });
+    setOtherForm({ machineId: 'A', componentType: 'other', componentName: '', lastReplacedDate: todayDDMMYYYY(), replacementCost: 0, expectedCycleUnits: 100000 });
   };
 
   const addPlateLog = () => {
@@ -121,9 +150,17 @@ export default function MaintenancePage() {
     setPlateForm({ date: todayDDMMYYYY(), description: '', cost: 0 });
   };
 
-  // Alerts
-  const heaterAlerts = heaters.filter(h => h.lastReplacedDate && daysUntil(h.lastReplacedDate, h.expectedCycleDays) <= 7);
-  const compAlerts = components.filter(c => c.lastReplacedDate && daysUntil(c.lastReplacedDate, c.expectedCycleDays) <= 7);
+  // Alerts — triggered when >= 90% of cycle cups consumed
+  const heaterAlerts = heaters.filter(h => {
+    if (!h.lastReplacedDate) return false;
+    const used = cupsUsedSince(h.machineId, h.lastReplacedDate, prodSessions);
+    return used >= (h.expectedCycleUnits || 1) * ALERT_THRESHOLD;
+  });
+  const compAlerts = components.filter(c => {
+    if (!c.lastReplacedDate) return false;
+    const used = cupsUsedSince(c.machineId, c.lastReplacedDate, prodSessions);
+    return used >= (c.expectedCycleUnits || 1) * ALERT_THRESHOLD;
+  });
 
   // Monthly cost
   const month = currentMonth();
@@ -201,54 +238,78 @@ export default function MaintenancePage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {/* Heaters */}
                 {heaters.filter(h => h.machineId === machine).map(h => {
-                  const days = h.lastReplacedDate ? daysUntil(h.lastReplacedDate, h.expectedCycleDays) : null;
+                  const used = h.lastReplacedDate ? cupsUsedSince(h.machineId, h.lastReplacedDate, prodSessions) : 0;
                   return (
                     <div
                       key={h.heaterNumber}
-                      className="flex items-center justify-between p-3 rounded-lg border cursor-pointer hover:border-blue-400 transition-colors"
+                      className="flex flex-col p-3 rounded-lg border cursor-pointer hover:border-blue-400 transition-colors"
                       style={{ borderColor: 'var(--border)', background: 'var(--surface2)' }}
-                      onClick={() => { setHeaterModal(h); setHeaterForm({ date: todayDDMMYYYY(), cost: 0, cycleDays: h.expectedCycleDays }); }}
+                      onClick={() => { setHeaterModal(h); setHeaterForm({ date: todayDDMMYYYY(), cost: 0, cycleUnits: h.expectedCycleUnits }); }}
                     >
-                      <div>
-                        <div className="text-sm font-medium">Heater {h.heaterNumber}</div>
-                        {h.lastReplacedDate && <div className="text-xs" style={{ color: 'var(--text-muted)' }}>Replaced: {h.lastReplacedDate}</div>}
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="text-sm font-medium">Heater {h.heaterNumber}</div>
+                          {h.lastReplacedDate && <div className="text-xs" style={{ color: 'var(--text-muted)' }}>Since: {h.lastReplacedDate}</div>}
+                        </div>
+                        {h.lastReplacedDate ? getUsageBadge(used, h.expectedCycleUnits) : <Badge variant="gray">Never</Badge>}
                       </div>
-                      {days !== null ? getStatusBadge(days) : <Badge variant="gray">Never</Badge>}
+                      {h.lastReplacedDate && (
+                        <div className="mt-1.5">
+                          <div className="text-xs" style={{ color: 'var(--text-muted)' }}>{formatNumber(used)} / {formatNumber(h.expectedCycleUnits)} cups</div>
+                          <UsageBar used={used} total={h.expectedCycleUnits} />
+                        </div>
+                      )}
                     </div>
                   );
                 })}
                 {/* Components */}
                 {components.filter(c => c.machineId === machine && c.componentType !== 'other').map(c => {
-                  const days = c.lastReplacedDate ? daysUntil(c.lastReplacedDate, c.expectedCycleDays) : null;
+                  const used = c.lastReplacedDate ? cupsUsedSince(c.machineId, c.lastReplacedDate, prodSessions) : 0;
                   return (
                     <div
                       key={c.id}
-                      className="flex items-center justify-between p-3 rounded-lg border cursor-pointer hover:border-blue-400 transition-colors"
+                      className="flex flex-col p-3 rounded-lg border cursor-pointer hover:border-blue-400 transition-colors"
                       style={{ borderColor: 'var(--border)', background: 'var(--surface2)' }}
-                      onClick={() => { setCompModal(c); setCompForm({ date: todayDDMMYYYY(), cost: 0, cycleDays: c.expectedCycleDays }); }}
+                      onClick={() => { setCompModal(c); setCompForm({ date: todayDDMMYYYY(), cost: 0, cycleUnits: c.expectedCycleUnits }); }}
                     >
-                      <div>
-                        <div className="text-sm font-medium capitalize">{c.componentType === 'thermocouple' ? 'Thermocouple Wire' : 'Bottom Cutter'}</div>
-                        {c.lastReplacedDate && <div className="text-xs" style={{ color: 'var(--text-muted)' }}>Replaced: {c.lastReplacedDate}</div>}
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="text-sm font-medium capitalize">{c.componentType === 'thermocouple' ? 'Thermocouple Wire' : 'Bottom Cutter'}</div>
+                          {c.lastReplacedDate && <div className="text-xs" style={{ color: 'var(--text-muted)' }}>Since: {c.lastReplacedDate}</div>}
+                        </div>
+                        {c.lastReplacedDate ? getUsageBadge(used, c.expectedCycleUnits) : <Badge variant="gray">Never</Badge>}
                       </div>
-                      {days !== null ? getStatusBadge(days) : <Badge variant="gray">Never</Badge>}
+                      {c.lastReplacedDate && (
+                        <div className="mt-1.5">
+                          <div className="text-xs" style={{ color: 'var(--text-muted)' }}>{formatNumber(used)} / {formatNumber(c.expectedCycleUnits)} cups</div>
+                          <UsageBar used={used} total={c.expectedCycleUnits} />
+                        </div>
+                      )}
                     </div>
                   );
                 })}
                 {/* Other components */}
                 {components.filter(c => c.machineId === machine && c.componentType === 'other').map(c => {
-                  const days = c.lastReplacedDate ? daysUntil(c.lastReplacedDate, c.expectedCycleDays) : null;
+                  const used = c.lastReplacedDate ? cupsUsedSince(c.machineId, c.lastReplacedDate, prodSessions) : 0;
                   return (
                     <div
                       key={c.id}
-                      className="flex items-center justify-between p-3 rounded-lg border"
+                      className="flex flex-col p-3 rounded-lg border"
                       style={{ borderColor: 'var(--border)', background: 'var(--surface2)' }}
                     >
-                      <div>
-                        <div className="text-sm font-medium">{c.componentName}</div>
-                        {c.lastReplacedDate && <div className="text-xs" style={{ color: 'var(--text-muted)' }}>Replaced: {c.lastReplacedDate}</div>}
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="text-sm font-medium">{c.componentName}</div>
+                          {c.lastReplacedDate && <div className="text-xs" style={{ color: 'var(--text-muted)' }}>Since: {c.lastReplacedDate}</div>}
+                        </div>
+                        {c.lastReplacedDate ? getUsageBadge(used, c.expectedCycleUnits) : <Badge variant="gray">Never</Badge>}
                       </div>
-                      {days !== null ? getStatusBadge(days) : <Badge variant="gray">Never</Badge>}
+                      {c.lastReplacedDate && (
+                        <div className="mt-1.5">
+                          <div className="text-xs" style={{ color: 'var(--text-muted)' }}>{formatNumber(used)} / {formatNumber(c.expectedCycleUnits)} cups</div>
+                          <UsageBar used={used} total={c.expectedCycleUnits} />
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -269,13 +330,13 @@ export default function MaintenancePage() {
               { key: 'heaterNumber', label: 'Heater #' },
               { key: 'lastReplacedDate', label: 'Last Replaced', render: (r: Record<string, unknown>) => r.lastReplacedDate as string || '—' },
               { key: 'replacementCost', label: 'Last Cost', render: (r: Record<string, unknown>) => formatINR(r.replacementCost as number ?? 0) },
-              { key: 'expectedCycleDays', label: 'Cycle (days)' },
+              { key: 'expectedCycleUnits', label: 'Cycle (cups)', render: (r: Record<string, unknown>) => formatNumber(r.expectedCycleUnits as number ?? 0) },
               {
                 key: 'status', label: 'Status',
                 render: (r: Record<string, unknown>) => {
                   if (!r.lastReplacedDate) return <Badge variant="gray">Never replaced</Badge>;
-                  const days = daysUntil(r.lastReplacedDate as string, r.expectedCycleDays as number);
-                  return getStatusBadge(days);
+                  const used = cupsUsedSince(r.machineId as string, r.lastReplacedDate as string, prodSessions);
+                  return getUsageBadge(used, r.expectedCycleUnits as number ?? 0);
                 },
               },
               {
@@ -317,7 +378,7 @@ export default function MaintenancePage() {
             <div className="grid grid-cols-2 gap-4">
               <Input label="Replacement Date" type="date" value={toInputDate(heaterForm.date)} onChange={e => setHeaterForm(f => ({ ...f, date: fromInputDate(e.target.value) }))} />
               <Input label="Cost (₹)" type="number" min="0" value={heaterForm.cost} onChange={e => setHeaterForm(f => ({ ...f, cost: parseFloat(e.target.value) || 0 }))} />
-              <Input label="Cycle Days (expected)" type="number" min="1" value={heaterForm.cycleDays} onChange={e => setHeaterForm(f => ({ ...f, cycleDays: parseInt(e.target.value) || 45 }))} />
+              <Input label="Cycle (cups before next service)" type="number" min="1" value={heaterForm.cycleUnits} onChange={e => setHeaterForm(f => ({ ...f, cycleUnits: parseInt(e.target.value) || 500000 }))} />
             </div>
             {heaterModal.history.length > 0 && (
               <div>
@@ -331,7 +392,7 @@ export default function MaintenancePage() {
             )}
             <div className="flex justify-end gap-2 pt-4 border-t" style={{ borderColor: 'var(--border)' }}>
               <Button variant="secondary" onClick={() => setHeaterModal(null)}>Cancel</Button>
-              <Button onClick={() => updateHeater(heaterModal, heaterForm.date, heaterForm.cost, heaterForm.cycleDays)}>
+              <Button onClick={() => updateHeater(heaterModal, heaterForm.date, heaterForm.cost, heaterForm.cycleUnits)}>
                 Log Replacement
               </Button>
             </div>
@@ -345,11 +406,11 @@ export default function MaintenancePage() {
           <div className="grid grid-cols-2 gap-4">
             <Input label="Replacement Date" type="date" value={toInputDate(compForm.date)} onChange={e => setCompForm(f => ({ ...f, date: fromInputDate(e.target.value) }))} />
             <Input label="Cost (₹)" type="number" min="0" value={compForm.cost} onChange={e => setCompForm(f => ({ ...f, cost: parseFloat(e.target.value) || 0 }))} />
-            <Input label="Cycle Days" type="number" min="1" value={compForm.cycleDays} onChange={e => setCompForm(f => ({ ...f, cycleDays: parseInt(e.target.value) || 60 }))} />
+            <Input label="Cycle (cups before next service)" type="number" min="1" value={compForm.cycleUnits} onChange={e => setCompForm(f => ({ ...f, cycleUnits: parseInt(e.target.value) || 300000 }))} />
           </div>
           <div className="flex justify-end gap-2 mt-4 pt-4 border-t" style={{ borderColor: 'var(--border)' }}>
             <Button variant="secondary" onClick={() => setCompModal(null)}>Cancel</Button>
-            <Button onClick={() => updateComponent(compModal, compForm.date, compForm.cost, compForm.cycleDays)}>Log Replacement</Button>
+            <Button onClick={() => updateComponent(compModal, compForm.date, compForm.cost, compForm.cycleUnits)}>Log Replacement</Button>
           </div>
         </Modal>
       )}
@@ -363,7 +424,7 @@ export default function MaintenancePage() {
           <Input label="Part Name" value={otherForm.componentName ?? ''} onChange={e => setOtherForm(f => ({ ...f, componentName: e.target.value }))} />
           <Input label="Replacement Date" type="date" value={toInputDate(otherForm.lastReplacedDate)} onChange={e => setOtherForm(f => ({ ...f, lastReplacedDate: fromInputDate(e.target.value) }))} />
           <Input label="Cost (₹)" type="number" min="0" value={otherForm.replacementCost} onChange={e => setOtherForm(f => ({ ...f, replacementCost: parseFloat(e.target.value) || 0 }))} />
-          <Input label="Expected Cycle Days" type="number" min="1" value={otherForm.expectedCycleDays} onChange={e => setOtherForm(f => ({ ...f, expectedCycleDays: parseInt(e.target.value) || 30 }))} />
+          <Input label="Cycle (cups before next service)" type="number" min="1" value={otherForm.expectedCycleUnits} onChange={e => setOtherForm(f => ({ ...f, expectedCycleUnits: parseInt(e.target.value) || 100000 }))} />
         </div>
         <div className="flex justify-end gap-2 mt-4 pt-4 border-t" style={{ borderColor: 'var(--border)' }}>
           <Button variant="secondary" onClick={() => setOtherModal(false)}>Cancel</Button>

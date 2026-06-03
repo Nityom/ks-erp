@@ -83,6 +83,25 @@ export function daysUntil(ddmmyyyy: string, cycleDays: number): number {
   return Math.ceil((nextDue.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
 }
 
+export function parseDDMMYYYY(ddmmyyyy: string): number {
+  if (!ddmmyyyy) return 0;
+  const [dd, mm, yyyy] = ddmmyyyy.split('/');
+  return new Date(parseInt(yyyy), parseInt(mm) - 1, parseInt(dd)).getTime();
+}
+
+/** Sum cups produced on a machine strictly after the given sinceDate (DD/MM/YYYY) */
+export function cupsUsedSince(
+  machineId: string,
+  sinceDate: string,
+  sessions: { machineId: string; date: string; actualCupsProduced: number }[],
+): number {
+  if (!sinceDate) return 0;
+  const since = parseDDMMYYYY(sinceDate);
+  return sessions
+    .filter(s => s.machineId === machineId && parseDDMMYYYY(s.date) > since)
+    .reduce((sum, s) => sum + s.actualCupsProduced, 0);
+}
+
 export function classNames(...classes: (string | undefined | null | false)[]): string {
   return classes.filter(Boolean).join(' ');
 }
