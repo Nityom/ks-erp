@@ -62,6 +62,33 @@ export interface Settings {
   defaultSaleRate210ml: number;
   defaultSaleRate250ml: number;
   defaultSaleRatePlate: number;
+  // ── Paper consumption per cup (grams) — update whenever paper GSM/quality changes ──
+  // Blank paper (body of cup): measure by weighing 1 kg blank → count cups produced
+  blankGrams50ml: number;
+  blankGrams60ml: number;
+  blankGrams210ml: number;
+  blankGrams250ml: number;
+  // Bottom paper (base disc): measure by weighing batch of bottoms → count cups
+  bottomGrams50ml: number;
+  bottomGrams60ml: number;
+  bottomGrams210ml: number;
+  bottomGrams250ml: number;
+  // Bottom trim-waste % (e.g. 44 means 44% of bottom paper is cut off as trim)
+  // Used for net-weight display only — cost is always based on full grams purchased
+  bottomWastePct: number;
+  // ── Plate RM extras ──
+  // PP film (polypropylene laminate) cost per plate in ₹
+  ppCostPerPlate: number;
+  // Number of finished plates produced per sheet bundle (to fix RM cost per plate)
+  platesPerSheetBundle: number;
+  // Number of plates per bora bag (used to spread bora packaging cost per plate)
+  platesPerBora: number;
+  // ── Business / GST details ──
+  legalName: string;
+  tradeName: string;
+  gstin: string;
+  stateCode: string;
+  billingAddress: string;
 }
 
 // ─── RAW MATERIAL ─────────────────────────────────────────────────────────────

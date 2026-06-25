@@ -93,6 +93,26 @@ export function seedDummyData() {
     defaultSaleRate210ml: 0,
     defaultSaleRate250ml: 0,
     defaultSaleRatePlate: 0,
+    // Paper consumption — 160 GSM measured values for 210ml; proportional estimates for others
+    blankGrams50ml: 1.50,
+    blankGrams60ml: 1.80,
+    blankGrams210ml: 2.84,  // measured: 1000g blank → 351 cups
+    blankGrams250ml: 3.20,
+    bottomGrams50ml: 0.40,
+    bottomGrams60ml: 0.45,
+    bottomGrams210ml: 0.73, // measured: 257g bottom → 351 cups
+    bottomGrams250ml: 0.85,
+    bottomWastePct: 44,     // 80g waste per 180g bottom = 44% trim
+    // Plate extras
+    ppCostPerPlate: 0.035,
+    platesPerSheetBundle: 100,
+    platesPerBora: 400,     // 11rs per bora / 400 plates = ₹0.0275/plate
+    // Business / GST details
+    legalName: 'Kautilya Swaroop',
+    tradeName: 'KS Manufactory',
+    gstin: '10BVZPK9908A1ZG',
+    stateCode: '10',
+    billingAddress: 'KS Manufactory, Ram Swaroop sadan, damu chak road, Muzaffarpur, Bihar 842001',
   };
   saveSettings(settings);
 

@@ -66,9 +66,31 @@ const FIELDS: FieldDef[] = [
   { key: 'defaultSaleRate210ml', label: 'Cup 210 ml — Default Sale Rate', unit: '₹/unit', group: 'Default Selling Prices' },
   { key: 'defaultSaleRate250ml', label: 'Cup 250 ml — Default Sale Rate', unit: '₹/unit', group: 'Default Selling Prices' },
   { key: 'defaultSaleRatePlate', label: 'Plate 13" — Default Sale Rate', unit: '₹/unit', group: 'Default Selling Prices' },
+  // Paper consumption fields
+  { key: 'blankGrams50ml', label: 'Blank Paper — Cup 50 ml', unit: 'g/cup', group: 'Paper Consumption (update when GSM/quality changes)' },
+  { key: 'blankGrams60ml', label: 'Blank Paper — Cup 60 ml', unit: 'g/cup', group: 'Paper Consumption (update when GSM/quality changes)' },
+  { key: 'blankGrams210ml', label: 'Blank Paper — Cup 210 ml', unit: 'g/cup', group: 'Paper Consumption (update when GSM/quality changes)' },
+  { key: 'blankGrams250ml', label: 'Blank Paper — Cup 250 ml', unit: 'g/cup', group: 'Paper Consumption (update when GSM/quality changes)' },
+  { key: 'bottomGrams50ml', label: 'Bottom Paper — Cup 50 ml', unit: 'g/cup', group: 'Paper Consumption (update when GSM/quality changes)' },
+  { key: 'bottomGrams60ml', label: 'Bottom Paper — Cup 60 ml', unit: 'g/cup', group: 'Paper Consumption (update when GSM/quality changes)' },
+  { key: 'bottomGrams210ml', label: 'Bottom Paper — Cup 210 ml', unit: 'g/cup', group: 'Paper Consumption (update when GSM/quality changes)' },
+  { key: 'bottomGrams250ml', label: 'Bottom Paper — Cup 250 ml', unit: 'g/cup', group: 'Paper Consumption (update when GSM/quality changes)' },
+  { key: 'bottomWastePct', label: 'Bottom Trim Waste', unit: '%', group: 'Paper Consumption (update when GSM/quality changes)' },
+  // Plate extras
+  { key: 'ppCostPerPlate', label: 'PP Film Cost', unit: '₹/plate', group: 'Plate Raw Material' },
+  { key: 'platesPerSheetBundle', label: 'Plates per Sheet Bundle', unit: 'plates', group: 'Plate Raw Material' },
+  { key: 'platesPerBora', label: 'Plates per Bora Bag', unit: 'plates', group: 'Plate Raw Material' },
 ];
 
 const GROUPS = Array.from(new Set(FIELDS.map(f => f.group)));
+
+const TEXT_FIELDS: { key: keyof Settings; label: string; placeholder?: string }[] = [
+  { key: 'legalName',      label: 'Legal Name',       placeholder: 'e.g. Kautilya Swaroop' },
+  { key: 'tradeName',      label: 'Trade / Brand Name', placeholder: 'e.g. KS Manufactory' },
+  { key: 'gstin',          label: 'GSTIN',             placeholder: 'e.g. 10BVZPK9908A1ZG' },
+  { key: 'stateCode',      label: 'State Code',        placeholder: 'e.g. 10' },
+  { key: 'billingAddress', label: 'Billing Address',   placeholder: 'Full address for invoices' },
+];
 
 export default function SettingsPage() {
   const { settings, updateSettings } = useApp();
@@ -79,6 +101,10 @@ export default function SettingsPage() {
 
   const handleChange = (key: keyof Settings, val: string) => {
     setLocal(prev => ({ ...prev, [key]: parseFloat(val) || 0 }));
+  };
+
+  const handleTextChange = (key: keyof Settings, val: string) => {
+    setLocal(prev => ({ ...prev, [key]: val }));
   };
 
   const handleSave = () => {
@@ -102,6 +128,26 @@ export default function SettingsPage() {
         </div>
         <Button onClick={handleSave}>Save All Settings</Button>
       </div>
+
+      {/* Business / GST Details */}
+      <Card>
+        <SectionHeader title="Business & GST Details" subtitle="Used on invoices and GST reports" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {TEXT_FIELDS.map(f => (
+            <div key={f.key} className="flex flex-col gap-1">
+              <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>{f.label}</label>
+              <input
+                type="text"
+                value={(local[f.key] as string) ?? ''}
+                placeholder={f.placeholder}
+                onChange={e => handleTextChange(f.key, e.target.value)}
+                className="px-3 py-2 rounded-lg border text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                style={{ background: 'var(--surface2)', borderColor: 'var(--border)', color: 'var(--text)' }}
+              />
+            </div>
+          ))}
+        </div>
+      </Card>
 
       {/* Rate Groups */}
       {GROUPS.map(group => (

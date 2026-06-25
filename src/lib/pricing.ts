@@ -58,19 +58,31 @@ export function calcProductPrices(
   // RM cost per unit — simplified: use base rate from settings
   let rmCost = 0;
   if (product === 'plate') {
-    // 1 bundle = 20 plates, cost = sheet bundle rate / 20
-    rmCost = settings.plateSheetRatePerBundle / 20;
+    // RM cost per plate = sheet cost + PP film + bora packaging spread per plate
+    const platesPerBundle = settings.platesPerSheetBundle > 0 ? settings.platesPerSheetBundle : 100;
+    const sheetCostPerPlate = settings.plateSheetRatePerBundle / platesPerBundle;
+    const boraCostPerPlate = settings.platesPerBora > 0 ? settings.boraBagRate / settings.platesPerBora : 0;
+    rmCost = sheetCostPerPlate + settings.ppCostPerPlate + boraCostPerPlate;
   } else {
-    // For cups: use paperBlank + paperBottom as combined RM cost per cup
-    // Apportionment by size (larger cups use more paper)
-    const multipliers: Record<CupSize, number> = {
-      '50ml': 0.003,
-      '60ml': 0.0035,
-      '210ml': 0.008,
-      '250ml': 0.01,
+    // Cup RM cost = blank paper + bottom paper, calculated from actual grams per cup.
+    // Update blankGrams / bottomGrams in Settings whenever you change paper GSM or quality.
+    const blankGrams: Record<CupSize, number> = {
+      '50ml': settings.blankGrams50ml,
+      '60ml': settings.blankGrams60ml,
+      '210ml': settings.blankGrams210ml,
+      '250ml': settings.blankGrams250ml,
     };
-    const m = multipliers[product as CupSize] ?? 0.005;
-    rmCost = (settings.paperBlankRatePerKg + settings.paperBottomRatePerKg) * m;
+    const bottomGrams: Record<CupSize, number> = {
+      '50ml': settings.bottomGrams50ml,
+      '60ml': settings.bottomGrams60ml,
+      '210ml': settings.bottomGrams210ml,
+      '250ml': settings.bottomGrams250ml,
+    };
+    const bg = blankGrams[product as CupSize] ?? 2.84;
+    const btg = bottomGrams[product as CupSize] ?? 0.73;
+    rmCost =
+      (bg / 1000) * settings.paperBlankRatePerKg +
+      (btg / 1000) * settings.paperBottomRatePerKg;
   }
   if (overrides?.rmCost !== undefined) rmCost = overrides.rmCost;
 

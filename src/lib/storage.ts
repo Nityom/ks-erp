@@ -111,6 +111,26 @@ export const DEFAULT_SETTINGS: Settings = {
   defaultSaleRate210ml: 0,
   defaultSaleRate250ml: 0,
   defaultSaleRatePlate: 0,
+  // Paper grams per cup — based on 160 GSM measurement (update for different GSM/quality)
+  blankGrams50ml: 1.50,
+  blankGrams60ml: 1.80,
+  blankGrams210ml: 2.84,  // from: 1000g blank → 351 cups
+  blankGrams250ml: 3.20,
+  bottomGrams50ml: 0.40,
+  bottomGrams60ml: 0.45,
+  bottomGrams210ml: 0.73, // from: 257g bottom → 351 cups
+  bottomGrams250ml: 0.85,
+  bottomWastePct: 44,     // 80g waste per 180g bottom = 44.4% trim waste
+  // Plate extras
+  ppCostPerPlate: 0.035,  // PP film: ₹150/kg, ~0.23g per plate ≈ ₹0.035
+  platesPerSheetBundle: 100,
+  platesPerBora: 400,     // 11rs per bora / 400 plates = ₹0.0275/plate
+  // Business / GST details
+  legalName: '',
+  tradeName: '',
+  gstin: '',
+  stateCode: '',
+  billingAddress: '',
 };
 
 export function getSettings(): Settings {

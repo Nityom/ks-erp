@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { getRMPurchases, getSales } from '@/lib/storage';
+import { useApp } from '@/contexts/AppContext';
 import type { RawMaterialPurchase, SaleEntry } from '@/lib/types';
 import { Card, SectionHeader, Table, StatCard, Badge } from '@/components/UI';
 import { formatINR, monthLabel, currentMonth } from '@/lib/utils';
@@ -17,6 +18,7 @@ function groupByMonth<T extends { date: string }>(items: T[]): Record<string, T[
 }
 
 export default function GSTPage() {
+  const { settings } = useApp();
   const [purchases, setPurchases] = useState<RawMaterialPurchase[]>([]);
   const [sales, setSales] = useState<SaleEntry[]>([]);
   const [selectedMonth, setSelectedMonth] = useState(currentMonth());
@@ -53,6 +55,30 @@ export default function GSTPage() {
 
   return (
     <div className="space-y-4 max-w-5xl">
+      {/* Business Identity Card */}
+      {settings.gstin && (
+        <Card>
+          <div className="flex flex-col sm:flex-row sm:items-start gap-4">
+            <div className="flex-1">
+              <div className="text-lg font-bold" style={{ color: 'var(--text)' }}>{settings.tradeName || settings.legalName}</div>
+              {settings.tradeName && settings.legalName && (
+                <div className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Legal: {settings.legalName}</div>
+              )}
+              {settings.billingAddress && (
+                <div className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>{settings.billingAddress}</div>
+              )}
+            </div>
+            <div className="text-right shrink-0">
+              <div className="text-xs" style={{ color: 'var(--text-muted)' }}>GSTIN</div>
+              <div className="font-mono font-semibold text-sm" style={{ color: 'var(--text)' }}>{settings.gstin}</div>
+              {settings.stateCode && (
+                <div className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>State Code: {settings.stateCode}</div>
+              )}
+            </div>
+          </div>
+        </Card>
+      )}
+
       {/* YTD Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <StatCard label="GST Paid on Purchases (YTD)" value={formatINR(ytd.gstPaid)} color="red" subtext="Actual cash outflow" />
