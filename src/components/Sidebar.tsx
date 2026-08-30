@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Factory, Package, ShoppingCart, Truck,
   Users, Wrench, BarChart3, TrendingUp, Settings, FileText,
   Receipt, PieChart, ChevronLeft, ChevronRight, X, Menu,
-  Zap, Boxes
+  Zap, Boxes, BookUser
 } from 'lucide-react';
 import { classNames } from '@/lib/utils';
 import { useState } from 'react';
@@ -17,6 +17,7 @@ const navItems = [
   { href: '/finished-goods', label: 'Finished Goods', icon: Boxes },
   { href: '/transport', label: 'Transport', icon: Truck },
   { href: '/sales', label: 'Sales & Billing', icon: ShoppingCart },
+  { href: '/buyers', label: 'Buyers', icon: BookUser },
   { href: '/gst', label: 'GST Records', icon: Receipt },
   { href: '/workers', label: 'Workers', icon: Users },
   { href: '/maintenance', label: 'Maintenance', icon: Wrench },

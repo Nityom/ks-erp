@@ -1,5 +1,6 @@
 import type {
   Settings,
+  Buyer,
   RawMaterialPurchase,
   RawMaterialStock,
   CupProductionSession,
@@ -25,6 +26,7 @@ import type {
 
 const NS = {
   settings: 'pcp_settings',
+  buyers: 'pcp_buyers',
   rawMaterialPurchases: 'pcp_rm_purchases',
   rawMaterialStock: 'pcp_rm_stock',
   cupProduction: 'pcp_cup_production',
@@ -111,7 +113,7 @@ export const DEFAULT_SETTINGS: Settings = {
   defaultSaleRate210ml: 0,
   defaultSaleRate250ml: 0,
   defaultSaleRatePlate: 0,
-  // Paper grams per cup — based on 160 GSM measurement (update for different GSM/quality)
+  // Net paper grams per cup — used until die-cut areas are entered
   blankGrams50ml: 1.50,
   blankGrams60ml: 1.80,
   blankGrams210ml: 2.84,  // from: 1000g blank → 351 cups
@@ -120,11 +122,40 @@ export const DEFAULT_SETTINGS: Settings = {
   bottomGrams60ml: 0.45,
   bottomGrams210ml: 0.73, // from: 257g bottom → 351 cups
   bottomGrams250ml: 0.85,
+  wallAreaMm250ml: 0,
+  wallAreaMm260ml: 0,
+  wallAreaMm2210ml: 0,
+  wallAreaMm2250ml: 0,
+  bottomAreaMm250ml: 0,
+  bottomAreaMm260ml: 0,
+  bottomAreaMm2210ml: 0,
+  bottomAreaMm2250ml: 0,
+  wallBaseGsm: 160,
+  wallPeGsm: 0,
+  bottomBaseGsm: 160,
+  bottomPeGsm: 0,
+  blankWastePct: 0,
   bottomWastePct: 44,     // 80g waste per 180g bottom = 44.4% trim waste
+  printingCost50ml: 0,
+  printingCost60ml: 0,
+  printingCost210ml: 0,
+  printingCost250ml: 0,
+  electricityCost50ml: 0,
+  electricityCost60ml: 0,
+  electricityCost210ml: 0,
+  electricityCost250ml: 0,
+  packagingCost50ml: 0,
+  packagingCost60ml: 0,
+  packagingCost210ml: 0,
+  packagingCost250ml: 0,
+  monthlyOperationalOverhead: 0,
+  monthlyGoodCupVolume: 0,
   // Plate extras
   ppCostPerPlate: 0.035,  // PP film: ₹150/kg, ~0.23g per plate ≈ ₹0.035
   platesPerSheetBundle: 100,
   platesPerBora: 400,     // 11rs per bora / 400 plates = ₹0.0275/plate
+  defaultPlatesPerBora: 20,
+  defaultCupsPerBundle: 25,
   // Business / GST details
   legalName: '',
   tradeName: '',
@@ -138,6 +169,15 @@ export function getSettings(): Settings {
 }
 export function saveSettings(s: Settings): void {
   set(NS.settings, s);
+}
+
+// ─── BUYERS ───────────────────────────────────────────────────────────────────
+
+export function getBuyers(): Buyer[] {
+  return get<Buyer[]>(NS.buyers, []);
+}
+export function saveBuyers(data: Buyer[]): void {
+  set(NS.buyers, data);
 }
 
 // ─── RAW MATERIAL ─────────────────────────────────────────────────────────────

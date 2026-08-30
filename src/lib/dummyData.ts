@@ -93,7 +93,7 @@ export function seedDummyData() {
     defaultSaleRate210ml: 0,
     defaultSaleRate250ml: 0,
     defaultSaleRatePlate: 0,
-    // Paper consumption — 160 GSM measured values for 210ml; proportional estimates for others
+    // Net paper consumption — used until die-cut areas are entered
     blankGrams50ml: 1.50,
     blankGrams60ml: 1.80,
     blankGrams210ml: 2.84,  // measured: 1000g blank → 351 cups
@@ -102,11 +102,40 @@ export function seedDummyData() {
     bottomGrams60ml: 0.45,
     bottomGrams210ml: 0.73, // measured: 257g bottom → 351 cups
     bottomGrams250ml: 0.85,
+    wallAreaMm250ml: 0,
+    wallAreaMm260ml: 0,
+    wallAreaMm2210ml: 0,
+    wallAreaMm2250ml: 0,
+    bottomAreaMm250ml: 0,
+    bottomAreaMm260ml: 0,
+    bottomAreaMm2210ml: 0,
+    bottomAreaMm2250ml: 0,
+    wallBaseGsm: 160,
+    wallPeGsm: 0,
+    bottomBaseGsm: 160,
+    bottomPeGsm: 0,
+    blankWastePct: 0,
     bottomWastePct: 44,     // 80g waste per 180g bottom = 44% trim
+    printingCost50ml: 0.02,
+    printingCost60ml: 0.02,
+    printingCost210ml: 0.03,
+    printingCost250ml: 0.03,
+    electricityCost50ml: 0.01,
+    electricityCost60ml: 0.01,
+    electricityCost210ml: 0.015,
+    electricityCost250ml: 0.015,
+    packagingCost50ml: 0.04,
+    packagingCost60ml: 0.04,
+    packagingCost210ml: 0.05,
+    packagingCost250ml: 0.05,
+    monthlyOperationalOverhead: 150000,
+    monthlyGoodCupVolume: 1000000,
     // Plate extras
     ppCostPerPlate: 0.035,
     platesPerSheetBundle: 100,
     platesPerBora: 400,     // 11rs per bora / 400 plates = ₹0.0275/plate
+    defaultPlatesPerBora: 20,
+    defaultCupsPerBundle: 25,
     // Business / GST details
     legalName: 'Kautilya Swaroop',
     tradeName: 'KS Manufactory',

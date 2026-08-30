@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useApp } from '@/contexts/AppContext';
-import { Card, Button, Input, SectionHeader, Alert } from '@/components/UI';
+import { Card, Button, SectionHeader, Alert } from '@/components/UI';
 import { formatINR } from '@/lib/utils';
 import { getAllProductPrices, PRODUCT_LABELS } from '@/lib/pricing';
 import type { Settings } from '@/lib/types';
@@ -21,7 +21,7 @@ const FIELDS: FieldDef[] = [
   { key: 'mobilOilRatePerLitre', label: 'Mobil Oil Rate', unit: '₹/litre', group: 'Raw Material Rates' },
   { key: 'plateSheetRatePerBundle', label: 'Plate Sheet Rate', unit: '₹/bundle(100 sheets)', group: 'Raw Material Rates' },
   // Packaging
-  { key: 'ptRollRate', label: 'PT Roll Rate', unit: '₹/roll', group: 'Packaging Rates' },
+  { key: 'ptRollRate', label: 'PP Roll Rate', unit: '₹/roll', group: 'Packaging Rates' },
   { key: 'boraBagRate', label: 'Bora Bag Rate', unit: '₹/bora', group: 'Packaging Rates' },
   { key: 'cartonBoxRate', label: 'Carton Box Rate', unit: '₹/carton', group: 'Packaging Rates' },
   { key: 'transparentTapeRate', label: 'Transparent Tape Rate', unit: '₹/roll', group: 'Packaging Rates' },
@@ -43,14 +43,16 @@ const FIELDS: FieldDef[] = [
   { key: 'piecerate60ml', label: 'Piece Rate — Cup 60 ml', unit: '₹/1000 cups', group: 'Worker Piece Rates' },
   { key: 'piecerate210ml', label: 'Piece Rate — Cup 210 ml', unit: '₹/1000 cups', group: 'Worker Piece Rates' },
   { key: 'piecerate250ml', label: 'Piece Rate — Cup 250 ml', unit: '₹/1000 cups', group: 'Worker Piece Rates' },
-  { key: 'pieceratePlate', label: 'Piece Rate — Plate', unit: '₹/bundle', group: 'Worker Piece Rates' },
+  { key: 'pieceratePlate', label: 'Piece Rate — Plate', unit: '₹/bora', group: 'Worker Piece Rates' },
+  { key: 'defaultCupsPerBundle', label: 'Default Cups per Bundle', unit: 'cups', group: 'Worker Piece Rates' },
+  { key: 'defaultPlatesPerBora', label: 'Default Plates per Bora', unit: 'plates', group: 'Worker Piece Rates' },
   // Thresholds RM
   { key: 'thresholdPaperBlank', label: 'Low Stock — Paper Blank', unit: 'kg', group: 'Low Stock Alerts' },
   { key: 'thresholdPaperBottom', label: 'Low Stock — Paper Bottom', unit: 'kg', group: 'Low Stock Alerts' },
   { key: 'thresholdParaffinOil', label: 'Low Stock — Paraffin Oil', unit: 'litres', group: 'Low Stock Alerts' },
   { key: 'thresholdMobilOil', label: 'Low Stock — Mobil Oil', unit: 'litres', group: 'Low Stock Alerts' },
   { key: 'thresholdPlateSheets', label: 'Low Stock — Plate Sheets', unit: 'bundles', group: 'Low Stock Alerts' },
-  { key: 'thresholdPtRoll', label: 'Low Stock — PT Rolls', unit: 'rolls', group: 'Low Stock Alerts' },
+  { key: 'thresholdPtRoll', label: 'Low Stock — PP Rolls', unit: 'rolls', group: 'Low Stock Alerts' },
   { key: 'thresholdBoraBag', label: 'Low Stock — Bora Bags', unit: 'boras', group: 'Low Stock Alerts' },
   { key: 'thresholdCarton', label: 'Low Stock — Cartons', unit: 'boxes', group: 'Low Stock Alerts' },
   // FG thresholds
@@ -66,16 +68,44 @@ const FIELDS: FieldDef[] = [
   { key: 'defaultSaleRate210ml', label: 'Cup 210 ml — Default Sale Rate', unit: '₹/unit', group: 'Default Selling Prices' },
   { key: 'defaultSaleRate250ml', label: 'Cup 250 ml — Default Sale Rate', unit: '₹/unit', group: 'Default Selling Prices' },
   { key: 'defaultSaleRatePlate', label: 'Plate 13" — Default Sale Rate', unit: '₹/unit', group: 'Default Selling Prices' },
-  // Paper consumption fields
-  { key: 'blankGrams50ml', label: 'Blank Paper — Cup 50 ml', unit: 'g/cup', group: 'Paper Consumption (update when GSM/quality changes)' },
-  { key: 'blankGrams60ml', label: 'Blank Paper — Cup 60 ml', unit: 'g/cup', group: 'Paper Consumption (update when GSM/quality changes)' },
-  { key: 'blankGrams210ml', label: 'Blank Paper — Cup 210 ml', unit: 'g/cup', group: 'Paper Consumption (update when GSM/quality changes)' },
-  { key: 'blankGrams250ml', label: 'Blank Paper — Cup 250 ml', unit: 'g/cup', group: 'Paper Consumption (update when GSM/quality changes)' },
-  { key: 'bottomGrams50ml', label: 'Bottom Paper — Cup 50 ml', unit: 'g/cup', group: 'Paper Consumption (update when GSM/quality changes)' },
-  { key: 'bottomGrams60ml', label: 'Bottom Paper — Cup 60 ml', unit: 'g/cup', group: 'Paper Consumption (update when GSM/quality changes)' },
-  { key: 'bottomGrams210ml', label: 'Bottom Paper — Cup 210 ml', unit: 'g/cup', group: 'Paper Consumption (update when GSM/quality changes)' },
-  { key: 'bottomGrams250ml', label: 'Bottom Paper — Cup 250 ml', unit: 'g/cup', group: 'Paper Consumption (update when GSM/quality changes)' },
-  { key: 'bottomWastePct', label: 'Bottom Trim Waste', unit: '%', group: 'Paper Consumption (update when GSM/quality changes)' },
+  // Paper calculation
+  { key: 'wallBaseGsm', label: 'Wall Base Paper', unit: 'GSM', group: 'Paper GSM & Wastage' },
+  { key: 'wallPeGsm', label: 'Wall PE Coating', unit: 'GSM', group: 'Paper GSM & Wastage' },
+  { key: 'bottomBaseGsm', label: 'Bottom Base Paper', unit: 'GSM', group: 'Paper GSM & Wastage' },
+  { key: 'bottomPeGsm', label: 'Bottom PE Coating', unit: 'GSM', group: 'Paper GSM & Wastage' },
+  { key: 'blankWastePct', label: 'Wall Production Loss', unit: '% true loss', group: 'Paper GSM & Wastage' },
+  { key: 'bottomWastePct', label: 'Bottom Trim Loss', unit: '% true loss', group: 'Paper GSM & Wastage' },
+  { key: 'wallAreaMm250ml', label: 'Wall Die-cut Area — 50 ml', unit: 'mm²; 0 uses measured g', group: 'Cup Die-cut Areas' },
+  { key: 'wallAreaMm260ml', label: 'Wall Die-cut Area — 60 ml', unit: 'mm²; 0 uses measured g', group: 'Cup Die-cut Areas' },
+  { key: 'wallAreaMm2210ml', label: 'Wall Die-cut Area — 210 ml', unit: 'mm²; 0 uses measured g', group: 'Cup Die-cut Areas' },
+  { key: 'wallAreaMm2250ml', label: 'Wall Die-cut Area — 250 ml', unit: 'mm²; 0 uses measured g', group: 'Cup Die-cut Areas' },
+  { key: 'bottomAreaMm250ml', label: 'Bottom Disc Area — 50 ml', unit: 'mm²; 0 uses measured g', group: 'Cup Die-cut Areas' },
+  { key: 'bottomAreaMm260ml', label: 'Bottom Disc Area — 60 ml', unit: 'mm²; 0 uses measured g', group: 'Cup Die-cut Areas' },
+  { key: 'bottomAreaMm2210ml', label: 'Bottom Disc Area — 210 ml', unit: 'mm²; 0 uses measured g', group: 'Cup Die-cut Areas' },
+  { key: 'bottomAreaMm2250ml', label: 'Bottom Disc Area — 250 ml', unit: 'mm²; 0 uses measured g', group: 'Cup Die-cut Areas' },
+  { key: 'blankGrams50ml', label: 'Net Wall Weight — 50 ml', unit: 'g fallback', group: 'Measured Paper Weight Fallback' },
+  { key: 'blankGrams60ml', label: 'Net Wall Weight — 60 ml', unit: 'g fallback', group: 'Measured Paper Weight Fallback' },
+  { key: 'blankGrams210ml', label: 'Net Wall Weight — 210 ml', unit: 'g fallback', group: 'Measured Paper Weight Fallback' },
+  { key: 'blankGrams250ml', label: 'Net Wall Weight — 250 ml', unit: 'g fallback', group: 'Measured Paper Weight Fallback' },
+  { key: 'bottomGrams50ml', label: 'Net Bottom Weight — 50 ml', unit: 'g fallback', group: 'Measured Paper Weight Fallback' },
+  { key: 'bottomGrams60ml', label: 'Net Bottom Weight — 60 ml', unit: 'g fallback', group: 'Measured Paper Weight Fallback' },
+  { key: 'bottomGrams210ml', label: 'Net Bottom Weight — 210 ml', unit: 'g fallback', group: 'Measured Paper Weight Fallback' },
+  { key: 'bottomGrams250ml', label: 'Net Bottom Weight — 250 ml', unit: 'g fallback', group: 'Measured Paper Weight Fallback' },
+  // Operational cost per cup
+  { key: 'printingCost50ml', label: 'Printing — 50 ml', unit: '₹/cup', group: 'Cup Operational Costs' },
+  { key: 'printingCost60ml', label: 'Printing — 60 ml', unit: '₹/cup', group: 'Cup Operational Costs' },
+  { key: 'printingCost210ml', label: 'Printing — 210 ml', unit: '₹/cup', group: 'Cup Operational Costs' },
+  { key: 'printingCost250ml', label: 'Printing — 250 ml', unit: '₹/cup', group: 'Cup Operational Costs' },
+  { key: 'electricityCost50ml', label: 'Electricity — 50 ml', unit: '₹/cup', group: 'Cup Operational Costs' },
+  { key: 'electricityCost60ml', label: 'Electricity — 60 ml', unit: '₹/cup', group: 'Cup Operational Costs' },
+  { key: 'electricityCost210ml', label: 'Electricity — 210 ml', unit: '₹/cup', group: 'Cup Operational Costs' },
+  { key: 'electricityCost250ml', label: 'Electricity — 250 ml', unit: '₹/cup', group: 'Cup Operational Costs' },
+  { key: 'packagingCost50ml', label: 'Packaging — 50 ml', unit: '₹/cup', group: 'Cup Operational Costs' },
+  { key: 'packagingCost60ml', label: 'Packaging — 60 ml', unit: '₹/cup', group: 'Cup Operational Costs' },
+  { key: 'packagingCost210ml', label: 'Packaging — 210 ml', unit: '₹/cup', group: 'Cup Operational Costs' },
+  { key: 'packagingCost250ml', label: 'Packaging — 250 ml', unit: '₹/cup', group: 'Cup Operational Costs' },
+  { key: 'monthlyOperationalOverhead', label: 'Monthly Rent, Maintenance & Depreciation', unit: '₹/month', group: 'Cup Operational Costs' },
+  { key: 'monthlyGoodCupVolume', label: 'Monthly Good Cup Output', unit: 'cups/month', group: 'Cup Operational Costs' },
   // Plate extras
   { key: 'ppCostPerPlate', label: 'PP Film Cost', unit: '₹/plate', group: 'Plate Raw Material' },
   { key: 'platesPerSheetBundle', label: 'Plates per Sheet Bundle', unit: 'plates', group: 'Plate Raw Material' },
@@ -176,7 +206,7 @@ export default function SettingsPage() {
 
       {/* Live Price Table */}
       <Card>
-        <SectionHeader title="Live Pricing Preview" subtitle="Auto-calculated from current rates — updates as you edit" />
+        <SectionHeader title="Live Pricing Preview" subtitle="Manufacturing cost + transport + margin; GST shown separately" />
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
@@ -192,7 +222,22 @@ export default function SettingsPage() {
                 const p = prices[prod];
                 return (
                   <tr key={prod} className="border-t" style={{ borderColor: 'var(--border)' }}>
-                    <td className="px-3 py-2 font-medium" style={{ color: 'var(--text)' }}>{PRODUCT_LABELS[prod]}</td>
+                    <td className="px-3 py-2 font-medium" style={{ color: 'var(--text)' }}>
+                      <div>{PRODUCT_LABELS[prod]}</div>
+                      <div className="font-normal mt-1" style={{ color: 'var(--text-muted)' }}>
+                        Mfg: {formatINR(p.hocker.manufacturingCostPerUnit)}
+                      </div>
+                      {prod !== 'plate' && (
+                        <div className="font-normal" style={{ color: 'var(--text-muted)' }}>
+                          Paper {formatINR(p.hocker.breakdown.paperCost)} · Labour {formatINR(p.hocker.breakdown.laborCost)} · Operations {formatINR(
+                            p.hocker.breakdown.printingCost +
+                            p.hocker.breakdown.electricityCost +
+                            p.hocker.breakdown.packagingCost +
+                            p.hocker.breakdown.overheadCost
+                          )}
+                        </div>
+                      )}
+                    </td>
                     {[p.hocker, p.wholesaler, p.retailer, p.friend_zero, p.friend_profit].map((ch, i) => (
                       <td key={i} className="px-3 py-2 text-right">
                         <div className="font-semibold" style={{ color: 'var(--green)' }}>{formatINR(ch.priceWithoutGST)}</div>

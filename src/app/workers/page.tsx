@@ -57,7 +57,7 @@ export default function WorkersPage() {
   const [attForm, setAttForm] = useState<Omit<AttendanceEntry, 'id'>>({ workerId: '', month: currentMonth(), presentDays: 0, absentDays: 0, halfDays: 0, totalWorkingDays: 26 });
   const [advForm, setAdvForm] = useState<Omit<SalaryAdvance, 'id' | 'amountDeducted' | 'fullyDeducted'>>({ workerId: '', date: todayDDMMYYYY(), amount: 0, deductOver: 1 });
   const [prWorkerForm, setPrWorkerForm] = useState<Omit<PieceRateWorker, 'id'>>({ name: '', phone: '', active: true });
-  const [prEntryForm, setPrEntryForm] = useState<Omit<PieceRateEntry, 'id' | 'earningsAmount'>>({ workerId: '', date: todayDDMMYYYY(), productType: '50ml', quantityProduced: 0 });
+  const [prEntryForm, setPrEntryForm] = useState<Omit<PieceRateEntry, 'id' | 'earningsAmount'>>({ workerId: '', date: todayDDMMYYYY(), productType: '50ml', packCount: 0, unitsPerPack: 0, quantityProduced: 0 });
   const [prPayForm, setPrPayForm] = useState<Omit<PieceRatePayment, 'id'>>({ workerId: '', date: todayDDMMYYYY(), amountPaid: 0 });
 
   useEffect(() => {
@@ -150,13 +150,26 @@ export default function WorkersPage() {
   };
 
   const savePrEntry = () => {
-    const rate = getPieceRate(prEntryForm.productType);
-    const earnings = prEntryForm.quantityProduced * rate;
-    const entry: PieceRateEntry = { ...prEntryForm, id: generateId(), earningsAmount: earnings };
+    const isPlate = prEntryForm.productType === 'plate';
+    const packCount = prEntryForm.packCount ?? 0;
+    const unitsPerPack = prEntryForm.unitsPerPack ?? 1;
+    const totalUnits = prEntryForm.quantityProduced > 0 ? prEntryForm.quantityProduced : packCount * unitsPerPack;
+    // Plates: paid per bora (packCount); Cups: paid per total cups produced
+    const earnings = isPlate
+      ? packCount * settings.pieceratePlate
+      : totalUnits * getPieceRate(prEntryForm.productType);
+    const entry: PieceRateEntry = {
+      ...prEntryForm,
+      id: generateId(),
+      packCount,
+      unitsPerPack,
+      quantityProduced: totalUnits,
+      earningsAmount: earnings,
+    };
     const updated = [...prEntries, entry];
     savePieceRateEntries(updated); setPrEntries(updated);
     setPrEntryModal(false);
-    setPrEntryForm({ workerId: '', date: todayDDMMYYYY(), productType: '50ml', quantityProduced: 0 });
+    setPrEntryForm({ workerId: '', date: todayDDMMYYYY(), productType: '50ml', packCount: 0, unitsPerPack: settings.defaultCupsPerBundle, quantityProduced: 0 });
   };
 
   const savePrPayment = (workerId: string, amount: number) => {
@@ -210,7 +223,10 @@ export default function WorkersPage() {
           </div>
         ) : (
           <div className="flex gap-2">
-            <Button variant="secondary" size="sm" onClick={() => setPrEntryModal(true)}>+ Add Work Entry</Button>
+            <Button variant="secondary" size="sm" onClick={() => {
+              setPrEntryForm({ workerId: '', date: todayDDMMYYYY(), productType: '50ml', packCount: 0, unitsPerPack: settings.defaultCupsPerBundle, quantityProduced: 0 });
+              setPrEntryModal(true);
+            }}>+ Add Work Entry</Button>
             <Button onClick={() => setPrWorkerModal(true)}><Plus size={14} /> Add Worker</Button>
           </div>
         )}
@@ -359,7 +375,18 @@ export default function WorkersPage() {
                   render: (r: Record<string, unknown>) => prWorkers.find(w => w.id === r.workerId)?.name ?? '—',
                 },
                 { key: 'productType', label: 'Product' },
-                { key: 'quantityProduced', label: 'Qty', render: (r: Record<string, unknown>) => formatNumber(r.quantityProduced as number) },
+                { key: 'quantityProduced', label: 'Qty',
+                  render: (r: Record<string, unknown>) => {
+                    const pc = r.packCount as number;
+                    const up = r.unitsPerPack as number;
+                    if (pc > 0 && up > 0) {
+                      const unit = r.productType === 'plate' ? 'boras' : 'bundles';
+                      const itemUnit = r.productType === 'plate' ? 'plates' : 'cups';
+                      return `${pc} ${unit} ×${up} = ${formatNumber(r.quantityProduced as number)} ${itemUnit}`;
+                    }
+                    return formatNumber(r.quantityProduced as number);
+                  },
+                },
                 { key: 'earningsAmount', label: 'Earnings', render: (r: Record<string, unknown>) => formatINR(r.earningsAmount as number) },
               ]}
               data={prEntries as unknown as Record<string, unknown>[]}
@@ -458,29 +485,106 @@ export default function WorkersPage() {
 
       {/* PR Entry */}
       <Modal open={prEntryModal} onClose={() => setPrEntryModal(false)} title="Add Daily Work Entry">
-        <div className="grid grid-cols-2 gap-4">
-          <Input label="Date" type="date" value={toInputDate(prEntryForm.date)} onChange={e => setPrEntryForm(f => ({ ...f, date: fromInputDate(e.target.value) }))} />
-          <Select label="Worker" value={prEntryForm.workerId} onChange={e => setPrEntryForm(f => ({ ...f, workerId: e.target.value }))}>
-            <option value="">Select worker</option>
-            {prWorkers.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-          </Select>
-          <Select label="Product" value={prEntryForm.productType} onChange={e => setPrEntryForm(f => ({ ...f, productType: e.target.value as ProductType }))}>
-            {PRODUCTS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
-          </Select>
-          <Input label={prEntryForm.productType === 'plate' ? 'Bundles Produced' : 'Cups Produced'} type="number" min="0" value={prEntryForm.quantityProduced} onChange={e => setPrEntryForm(f => ({ ...f, quantityProduced: parseInt(e.target.value) || 0 }))} />
-          <div className="col-span-2 p-3 rounded-lg" style={{ background: 'var(--surface2)' }}>
-            <div className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Calculated Earnings</div>
-            <div className="text-xl font-bold" style={{ color: 'var(--green)' }}>
-              {formatINR(prEntryForm.quantityProduced * getPieceRate(prEntryForm.productType))}
+        {(() => {
+          const isPlate = prEntryForm.productType === 'plate';
+          const packLabel = isPlate ? 'Number of Boras' : 'Number of Bundles';
+          const unitLabel = isPlate ? 'Plates per Bora' : 'Cups per Bundle';
+          const totalLabel = isPlate ? 'Total Plates' : 'Total Cups';
+          const packCount = prEntryForm.packCount ?? 0;
+          const unitsPerPack = prEntryForm.unitsPerPack ?? 0;
+          const autoTotal = packCount * unitsPerPack;
+          const totalUnits = prEntryForm.quantityProduced > 0 ? prEntryForm.quantityProduced : autoTotal;
+          const previewEarnings = isPlate
+            ? packCount * settings.pieceratePlate
+            : totalUnits * getPieceRate(prEntryForm.productType);
+          return (
+            <div className="grid grid-cols-2 gap-4">
+              <Input label="Date" type="date" value={toInputDate(prEntryForm.date)} onChange={e => setPrEntryForm(f => ({ ...f, date: fromInputDate(e.target.value) }))} />
+              <Select label="Worker" value={prEntryForm.workerId} onChange={e => setPrEntryForm(f => ({ ...f, workerId: e.target.value }))}>
+                <option value="">Select worker</option>
+                {prWorkers.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+              </Select>
+              <Select label="Product" value={prEntryForm.productType} onChange={e => {
+                const pt = e.target.value as ProductType;
+                const isP = pt === 'plate';
+                setPrEntryForm(f => ({
+                  ...f,
+                  productType: pt,
+                  unitsPerPack: isP ? (settings.defaultPlatesPerBora || 20) : (settings.defaultCupsPerBundle || 25),
+                  quantityProduced: 0,
+                }));
+              }}>
+                {PRODUCTS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+              </Select>
+
+              {/* Pack count — same row as product */}
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>{packLabel}</label>
+                <input
+                  type="number" min="0" step="1"
+                  value={packCount || ''}
+                  placeholder="0"
+                  onChange={e => {
+                    const pc = parseInt(e.target.value) || 0;
+                    setPrEntryForm(f => ({ ...f, packCount: pc, quantityProduced: pc * (f.unitsPerPack ?? 0) }));
+                  }}
+                  className="px-3 py-2 rounded-lg border text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                  style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text)' }}
+                />
+              </div>
+
+              {/* Units per pack — fills the right slot */}
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
+                  {unitLabel} <span className="opacity-60">(flexible)</span>
+                </label>
+                <input
+                  type="number" min="1" step="1"
+                  value={unitsPerPack || ''}
+                  placeholder={isPlate ? String(settings.defaultPlatesPerBora || 20) : String(settings.defaultCupsPerBundle || 25)}
+                  onChange={e => {
+                    const up = parseInt(e.target.value) || 0;
+                    setPrEntryForm(f => ({ ...f, unitsPerPack: up, quantityProduced: (f.packCount ?? 0) * up }));
+                  }}
+                  className="px-3 py-2 rounded-lg border text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                  style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text)' }}
+                />
+              </div>
+
+              {/* Direct total override — right slot */}
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
+                  {totalLabel} <span className="opacity-60">(auto-filled — edit to override)</span>
+                </label>
+                <input
+                  type="number" min="0" step="1"
+                  value={prEntryForm.quantityProduced || ''}
+                  placeholder={autoTotal > 0 ? String(autoTotal) : '0'}
+                  onChange={e => setPrEntryForm(f => ({ ...f, quantityProduced: parseInt(e.target.value) || 0 }))}
+                  className="px-3 py-2 rounded-lg border text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                  style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text)' }}
+                />
+              </div>
+
+              {/* Earnings preview */}
+              <div className="col-span-2 p-3 rounded-lg" style={{ background: 'var(--surface2)' }}>
+                <div className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Calculated Earnings</div>
+                <div className="text-xl font-bold" style={{ color: 'var(--green)' }}>
+                  {formatINR(previewEarnings)}
+                </div>
+                <div className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+                  {isPlate
+                    ? `₹${settings.pieceratePlate}/bora × ${packCount} boras`
+                    : `₹${(getPieceRate(prEntryForm.productType) * 1000).toFixed(0)}/1000 cups × ${formatNumber(totalUnits)} cups`
+                  }
+                </div>
+              </div>
             </div>
-            <div className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
-              Rate: {formatINR(getPieceRate(prEntryForm.productType))} per {prEntryForm.productType === 'plate' ? 'bundle' : 'cup'}
-            </div>
-          </div>
-        </div>
+          );
+        })()}
         <div className="flex justify-end gap-2 mt-4 pt-4 border-t" style={{ borderColor: 'var(--border)' }}>
           <Button variant="secondary" onClick={() => setPrEntryModal(false)}>Cancel</Button>
-          <Button onClick={savePrEntry} disabled={!prEntryForm.workerId}>Save</Button>
+          <Button onClick={savePrEntry} disabled={!prEntryForm.workerId || ((prEntryForm.packCount ?? 0) <= 0 && prEntryForm.quantityProduced <= 0)}>Save</Button>
         </div>
       </Modal>
 

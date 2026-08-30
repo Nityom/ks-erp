@@ -85,7 +85,7 @@ export default function ExpensesPage() {
     const totalMaintenance = heaterCost + compCost + plateCost;
     if (totalMaintenance > 0) rows.push({ category: 'Machine Maintenance', amount: totalMaintenance, source: 'Auto - Maintenance' });
 
-    // Packaging materials (PT roll, bora, carton, tape, rope from packaging sessions)
+    // Packaging materials (PP roll, bora, carton, tape, rope from packaging sessions)
     const pkgSessions = getPackagingSessions().filter(p => isInMonth(p.date));
     const pkgCost = pkgSessions.reduce((sum, p) => {
       const pt = (p.ptRollUsed ?? 0) * settings.ptRollRate;

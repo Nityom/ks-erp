@@ -4,6 +4,18 @@ export type CupSize = '50ml' | '60ml' | '210ml' | '250ml';
 export type Channel = 'hocker' | 'wholesaler' | 'retailer' | 'friend';
 export type FriendMode = 'zero' | 'profit';
 
+// ─── BUYERS ───────────────────────────────────────────────────────────────────
+
+export interface Buyer {
+  id: string;
+  name: string;
+  channel: Channel;
+  phone?: string;
+  address?: string;
+  notes?: string;
+  createdAt: string; // DD/MM/YYYY
+}
+
 // ─── SETTINGS ─────────────────────────────────────────────────────────────────
 
 export interface Settings {
@@ -62,20 +74,45 @@ export interface Settings {
   defaultSaleRate210ml: number;
   defaultSaleRate250ml: number;
   defaultSaleRatePlate: number;
-  // ── Paper consumption per cup (grams) — update whenever paper GSM/quality changes ──
-  // Blank paper (body of cup): measure by weighing 1 kg blank → count cups produced
+  // ── Paper consumption per finished cup ──
+  // Net measured weights are used when the corresponding die-cut area is zero.
   blankGrams50ml: number;
   blankGrams60ml: number;
   blankGrams210ml: number;
   blankGrams250ml: number;
-  // Bottom paper (base disc): measure by weighing batch of bottoms → count cups
   bottomGrams50ml: number;
   bottomGrams60ml: number;
   bottomGrams210ml: number;
   bottomGrams250ml: number;
-  // Bottom trim-waste % (e.g. 44 means 44% of bottom paper is cut off as trim)
-  // Used for net-weight display only — cost is always based on full grams purchased
+  wallAreaMm250ml: number;
+  wallAreaMm260ml: number;
+  wallAreaMm2210ml: number;
+  wallAreaMm2250ml: number;
+  bottomAreaMm250ml: number;
+  bottomAreaMm260ml: number;
+  bottomAreaMm2210ml: number;
+  bottomAreaMm2250ml: number;
+  wallBaseGsm: number;
+  wallPeGsm: number;
+  bottomBaseGsm: number;
+  bottomPeGsm: number;
+  blankWastePct: number;
   bottomWastePct: number;
+  // ── Cup manufacturing costs (₹ per finished cup unless stated otherwise) ──
+  printingCost50ml: number;
+  printingCost60ml: number;
+  printingCost210ml: number;
+  printingCost250ml: number;
+  electricityCost50ml: number;
+  electricityCost60ml: number;
+  electricityCost210ml: number;
+  electricityCost250ml: number;
+  packagingCost50ml: number;
+  packagingCost60ml: number;
+  packagingCost210ml: number;
+  packagingCost250ml: number;
+  monthlyOperationalOverhead: number;
+  monthlyGoodCupVolume: number;
   // ── Plate RM extras ──
   // PP film (polypropylene laminate) cost per plate in ₹
   ppCostPerPlate: number;
@@ -83,6 +120,9 @@ export interface Settings {
   platesPerSheetBundle: number;
   // Number of plates per bora bag (used to spread bora packaging cost per plate)
   platesPerBora: number;
+  // Default pack sizes for piece-rate work entries (editable per entry in the form)
+  defaultPlatesPerBora: number; // default plates per bora for workers
+  defaultCupsPerBundle: number; // default cups per bundle for workers
   // ── Business / GST details ──
   legalName: string;
   tradeName: string;
@@ -217,6 +257,7 @@ export interface SaleEntry {
   friendMode?: FriendMode;
   rmCostTotal?: number; // for friend channel
   profitLoss?: number; // for friend channel
+  platesPerBora?: number; // actual plates packed per bora for this specific sale (plate + boras only)
   notes?: string;
 }
 
@@ -295,7 +336,10 @@ export interface PieceRateEntry {
   workerId: string;
   date: string;
   productType: ProductType;
-  quantityProduced: number;
+  // Breakdown fields — entered in the form, quantityProduced is derived
+  packCount?: number;    // boras (plates) or bundles (cups)
+  unitsPerPack?: number; // plates per bora OR cups per bundle (flexible per entry)
+  quantityProduced: number; // total units (total cups, or boras for plate earnings)
   earningsAmount: number; // auto-calc
 }
 

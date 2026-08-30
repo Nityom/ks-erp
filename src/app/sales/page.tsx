@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
-import { getSales, saveSales, getPayments, savePayments } from '@/lib/storage';
-import type { SaleEntry, PaymentEntry, Channel, ProductType, QuantityUnit, FriendMode, Settings } from '@/lib/types';
+import { getSales, saveSales, getPayments, savePayments, getBuyers } from '@/lib/storage';
+import type { SaleEntry, PaymentEntry, Channel, ProductType, QuantityUnit, FriendMode, Settings, Buyer } from '@/lib/types';
 import {
   Card, Button, Input, Select, Modal, Table, SectionHeader,
   Tabs, Badge, Alert, ConfirmDialog, StatCard,
@@ -74,6 +74,7 @@ export default function SalesPage() {
   const { settings, updateSettings } = useApp();
   const [sales, setSales] = useState<SaleEntry[]>([]);
   const [payments, setPayments] = useState<PaymentEntry[]>([]);
+  const [buyers, setBuyers] = useState<Buyer[]>([]);
   const [tab, setTab] = useState('sales');
   const [modal, setModal] = useState(false);
   const [paymentModal, setPaymentModal] = useState(false);
@@ -87,11 +88,16 @@ export default function SalesPage() {
   useEffect(() => {
     setSales(getSales());
     setPayments(getPayments());
+    setBuyers(getBuyers());
   }, []);
 
   const prices = getAllProductPrices(settings);
   const totalAmount = form.ratePerUnit * form.quantity;
   const pendingAmount = totalAmount - form.amountReceived;
+  const isPlateBorasSale = form.productType === 'plate' && form.quantityUnit === 'boras';
+  const totalPlatesInSale = isPlateBorasSale && (form.platesPerBora ?? 0) > 0
+    ? form.quantity * (form.platesPerBora ?? 0)
+    : null;
 
   // Returns the saved default rate for a product (or 0 if none saved yet)
   const getDefaultRate = (product: string) =>
@@ -99,7 +105,7 @@ export default function SalesPage() {
 
   // Open the new-sale modal with the current default rate pre-filled
   const openNewSale = () => {
-    setForm({ ...EMPTY_SALE, ratePerUnit: getDefaultRate('50ml') });
+    setForm({ ...EMPTY_SALE, ratePerUnit: getDefaultRate('50ml'), platesPerBora: settings.platesPerBora });
     setEditId(null);
     setModal(true);
   };
@@ -254,7 +260,13 @@ export default function SalesPage() {
               { key: 'productType', label: 'Product' },
               {
                 key: 'quantity', label: 'Qty',
-                render: (r: Record<string, unknown>) => `${formatNumber(r.quantity as number)} ${r.quantityUnit}`,
+                render: (r: Record<string, unknown>) => {
+                  const base = `${formatNumber(r.quantity as number)} ${r.quantityUnit}`;
+                  if (r.productType === 'plate' && r.quantityUnit === 'boras' && (r.platesPerBora as number) > 0) {
+                    return `${base} ×${r.platesPerBora}pl = ${formatNumber((r.quantity as number) * (r.platesPerBora as number))}`;
+                  }
+                  return base;
+                },
               },
               { key: 'ratePerUnit', label: 'Rate', render: (r: Record<string, unknown>) => formatINR(r.ratePerUnit as number) },
               { key: 'totalAmount', label: 'Total', render: (r: Record<string, unknown>) => formatINR(r.totalAmount as number) },
@@ -277,7 +289,7 @@ export default function SalesPage() {
                       {(r.pendingAmount as number) > 0 && (
                         <button onClick={() => openPayment(sale)} className="text-xs text-green-600 hover:underline">Pay</button>
                       )}
-                      <button onClick={() => { setForm({ ...sale }); setEditId(sale.id); setModal(true); }} className="text-xs text-blue-600 hover:underline">Edit</button>
+                      <button onClick={() => { setForm({ ...sale, platesPerBora: sale.platesPerBora ?? settings.platesPerBora }); setEditId(sale.id); setModal(true); }} className="text-xs text-blue-600 hover:underline">Edit</button>
                       <button onClick={() => setDeleteId(r.id as string)} className="text-xs text-red-600 hover:underline">Del</button>
                     </div>
                   );
@@ -421,7 +433,33 @@ export default function SalesPage() {
           <Select label="Sale Type" value={form.channel} onChange={e => setForm(f => ({ ...f, channel: e.target.value as Channel }))}>
             {CHANNELS.map(ch => <option key={ch.value} value={ch.value}>{ch.label}</option>)}
           </Select>
-          <Input label="Buyer Name" value={form.buyerName} onChange={e => setForm(f => ({ ...f, buyerName: e.target.value }))} />
+          <div className="col-span-2 flex flex-col gap-1">
+            <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Buyer Name</label>
+            <input
+              list="buyers-list"
+              value={form.buyerName}
+              onChange={e => {
+                const name = e.target.value;
+                const known = buyers.find(b => b.name === name);
+                setForm(f => ({
+                  ...f,
+                  buyerName: name,
+                  ...(known ? { channel: known.channel } : {}),
+                }));
+              }}
+              placeholder="Type or select buyer…"
+              className="px-3 py-2 rounded-lg border text-sm outline-none focus:ring-2 focus:ring-blue-500"
+              style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text)' }}
+            />
+            <datalist id="buyers-list">
+              {buyers.map(b => <option key={b.id} value={b.name}>{b.channel}</option>)}
+            </datalist>
+            {form.buyerName && !buyers.find(b => b.name === form.buyerName) && (
+              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                New buyer — save them in <a href="/buyers" className="underline" style={{ color: 'var(--blue)' }}>Buyers</a> to persist their channel
+              </span>
+            )}
+          </div>
           <Select label="Product" value={form.productType} onChange={e => {
             const prod = e.target.value as ProductType;
             const savedRate = getDefaultRate(prod);
@@ -433,6 +471,32 @@ export default function SalesPage() {
             {UNITS.map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
           </Select>
           <Input label="Quantity" type="number" min="0" value={form.quantity} onChange={e => setForm(f => ({ ...f, quantity: parseInt(e.target.value) || 0 }))} />
+
+          {isPlateBorasSale && (
+            <div className="col-span-2 grid grid-cols-2 gap-4">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
+                  Plates per Bora <span className="opacity-60">(for this buyer)</span>
+                </label>
+                <input
+                  type="number" min="1" step="1"
+                  value={form.platesPerBora ?? ''}
+                  placeholder={String(settings.platesPerBora)}
+                  onChange={e => setForm(f => ({ ...f, platesPerBora: parseInt(e.target.value) || undefined }))}
+                  className="px-3 py-2 rounded-lg border text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                  style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text)' }}
+                />
+              </div>
+              {totalPlatesInSale !== null && (
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Total Plates</label>
+                  <div className="px-3 py-2 rounded-lg border text-sm font-bold" style={{ background: 'var(--surface2)', borderColor: 'var(--border)', color: 'var(--text)' }}>
+                    {totalPlatesInSale.toLocaleString()} plates
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {form.channel === 'friend' && (
             <div className="col-span-2">

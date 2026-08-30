@@ -221,7 +221,7 @@ export default function FinishedGoodsPage() {
               { key: 'date', label: 'Date' },
               { key: 'productType', label: 'Type', render: (r: Record<string, unknown>) => <Badge variant={r.productType === 'cup' ? 'blue' : 'green'}>{r.productType as string}</Badge> },
               { key: 'size', label: 'Size', render: (r: Record<string, unknown>) => r.size as string || '—' },
-              { key: 'ptRollUsed', label: 'PT Rolls', render: (r: Record<string, unknown>) => r.ptRollUsed as number || 0 },
+              { key: 'ptRollUsed', label: 'PP Rolls', render: (r: Record<string, unknown>) => r.ptRollUsed as number || 0 },
               { key: 'tapeRollsUsed', label: 'Tape Rolls', render: (r: Record<string, unknown>) => r.tapeRollsUsed as number || 0 },
               { key: 'cartonsUsed', label: 'Cartons', render: (r: Record<string, unknown>) => r.cartonsUsed as number || 0 },
               { key: 'borasUsed', label: 'Boras', render: (r: Record<string, unknown>) => r.borasUsed as number || 0 },
@@ -264,7 +264,7 @@ export default function FinishedGoodsPage() {
               <Input label="Plastic Rope Used" type="number" min="0" step="0.1" value={form.plasticRopeUsed ?? 0} onChange={e => setForm(f => ({ ...f, plasticRopeUsed: parseFloat(e.target.value) || 0 }))} />
             </>
           )}
-          <Input label="PT Rolls Used" type="number" min="0" step="0.1" value={form.ptRollUsed ?? 0} onChange={e => setForm(f => ({ ...f, ptRollUsed: parseFloat(e.target.value) || 0 }))} />
+          <Input label="PP Rolls Used" type="number" min="0" step="0.1" value={form.ptRollUsed ?? 0} onChange={e => setForm(f => ({ ...f, ptRollUsed: parseFloat(e.target.value) || 0 }))} />
           <Input label="Tape Rolls Used" type="number" min="0" step="0.1" value={form.tapeRollsUsed ?? 0} onChange={e => setForm(f => ({ ...f, tapeRollsUsed: parseFloat(e.target.value) || 0 }))} />
         </div>
         <div className="flex justify-end gap-2 mt-4 pt-4 border-t" style={{ borderColor: 'var(--border)' }}>

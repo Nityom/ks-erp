@@ -18,7 +18,7 @@ const RM_TYPES: { value: RawMaterialType; label: string; unit: string }[] = [
   { value: 'paraffinOil', label: 'Paraffin Oil', unit: 'litres' },
   { value: 'mobilOil', label: 'Mobil Oil', unit: 'litres' },
   { value: 'plateSheets', label: 'Plate Sheets', unit: 'bundles' },
-  { value: 'ptRoll', label: 'PT Roll', unit: 'rolls' },
+  { value: 'ptRoll', label: 'PP Roll', unit: 'rolls' },
   { value: 'boraBag', label: 'Bora Bags', unit: 'boras' },
   { value: 'cartonBox', label: 'Carton Boxes', unit: 'boxes' },
   { value: 'transparentTape', label: 'Transparent Tape', unit: 'rolls' },
